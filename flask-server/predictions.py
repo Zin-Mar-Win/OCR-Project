@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
+#model_ner = spacy.load('flask-server\model-best')
+
+#!/usr/bin/env python
+# coding: utf-8
 
 
 import numpy as np
@@ -19,7 +23,7 @@ model_ner = spacy.load('flask-server\model-best')
 
 def cleanText(txt):
     whitespace = string.whitespace
-    punctuation = "!#$%&\¢'()*+:;<=>?[\\]^`{|}~"
+    punctuation = "!#%&\¢'()*+:;<=>?[\\]^`{|}~"
     tableWhitespace = str.maketrans('','',whitespace)
     tablePunctuation = str.maketrans('','',punctuation)
     text = str(txt)
@@ -54,14 +58,52 @@ def parser(text,label):
         text = text.title()
         
     elif label == 'DATE':
+        text = text.lower()        
+        str_InvoiceDate=re.findall('(?i)[invoice|date|date:]\s*?(\d{1,2}\/[A-Za-z]{3,10}\/\d{2,4}|[A-Za-z]{3,10}\s*\d{1,2}\s*[A-Za-z]{3,10}\s*\d{2,4}|\d{1,2}\s*[A-Za-z]{3,10}\s*\d{2,4}|\d{1,2}[-]\d{1,2}[-]\d{2,4}|\d{1,2}\/\d{1,2}\/\d{2,4}|\d{1,2}[.]\d{1,2}[.]\d{2,4}|[A-Za-z]{3,10}\s*\d{1,2}[,]\s*\d{2,4}|[A-Za-z]{3,10}\s*\d{2}[A-Za-z]{2}[,]\s*\d{2,4})',text)
+        #print(str_InvoiceDate) 
+        #print("....................")## [('alice', 'google.com'), ('bob', 'abc.com')]
+        #print(len(str_InvoiceDate))
+        #print("....................")
         text = text.lower()
-        text = re.sub(r'[^\d{2}/\d{2}/\d{4}$]','',text)
-        text = text.title()
+        for x in str_InvoiceDate:
+            #print(x)  ## username
+            text = re.sub(r''+ x,'',text)    
+
+        text =text.title()  
+        #print("....................")
+        #print(text)
+        #print("....................")
+        
         
     elif label == 'TOTAL':
+        print(".........Total...........")
         text = text.lower()
-        text = re.sub(r'[^\d*(\.)?(\d{0,2})?$]','',text)
+        str_InvoiceTotal=re.findall('(?i)[invoice|Invoice|lnvoice|total|balance|grand|amount|quote|gross]\s*?[invoice|tota1|total|payable|due|balance|grand|amount|value|due(cad)|to pay|quote|gross]\s*?[value|due|amount|total|payable|quote|pay|invoice|to pay]\s([$|EUR|GBP]\s?\d{1,10}[,]?\d{1,3}[.]\d{0,2}|[$|EUR|GBP]\s?\d{1,10}[,]?\d{1,3}|\d{1,10}[,]?\d{1,3}[.]\d{0,2})',text)
+        #print(str_InvoiceTotal) 
+        #print("....................")## [('alice', 'google.com'), ('bob', 'abc.com')]
+        #print(len(str_InvoiceTotal))
+        #print("....................")
+        maximum = 0
+        if len(str_InvoiceTotal)>0:
+                    maximum = str_InvoiceTotal[0]
+
+                    for i in str_InvoiceTotal:
+
+                        if i > maximum:
+
+                            maximum = i
+                        #         i=str(i)[:-1]+']'
+                        #         amount = i
+                    #print('arr ', str_InvoiceTotal)
+
+        #print(maximum)
+        text = text.lower()
+        #text = re.sub(r''+ str(maximum),'',text)   
+        #text = re.sub(str(maximum),'',text)    
         text = text.title()
+        #print(text)
+        #print("....................")
+        
         
     elif label == 'NUMBER':
         text = text.lower()
@@ -71,6 +113,10 @@ def parser(text,label):
     
         
     return text
+        
+    
+        
+    
 
 grp_gen = groupgen()
 
@@ -108,12 +154,17 @@ def getPredictions(image):
         
         #creating tokens
         datafram_tokens = pd.DataFrame(docjson['tokens'])
+        print(datafram_tokens)
         datafram_tokens['token'] = datafram_tokens[['start','end']].apply(
             lambda x:doc_text[x[0]:x[1]] , axis = 1)
 
-        right_table = pd.DataFrame(docjson['ents'])[['start','label']]
-        datafram_tokens = pd.merge(datafram_tokens,right_table,how='left',on='start')
+        datafram_tokens.drop(datafram_tokens[datafram_tokens['token'] == '$'].index, inplace = True)
+        datafram_tokens.drop(datafram_tokens[datafram_tokens['token'] == 'date'].index, inplace = True)
+
+        right_table = pd.DataFrame(docjson['ents'])[['start','end','label']]
+        datafram_tokens = pd.merge(datafram_tokens,right_table,how='inner',on='end')
         datafram_tokens.fillna('O',inplace=True)
+        datafram_tokens['start']=datafram_tokens['start_y']
 
         # join lable to df_clean dataframe
         df_clean['end'] = df_clean['text'].apply(lambda x: len(x)+1).cumsum() - 1 
@@ -150,7 +201,7 @@ def getPredictions(image):
 
         })
 
-        
+        print(img_tagging)
         print("img_bb ", img_bb)
         # for l,r,t,b,label,token in img_tagging.values:
         #     cv2.rectangle(img_bb,(l,t),(r,b),(0,255,0),2)
@@ -169,6 +220,7 @@ def getPredictions(image):
 
             # step -1 parse the token
             text = parser(token,label_tag)
+            print("text is ", text)
 
             if bio_tag in ('B','I'):
 
